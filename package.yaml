@@ -28,6 +28,7 @@ dependencies:
   - text
   - warp
   - wai
+  - http-client
 
 ghc-options:
   - -Wall

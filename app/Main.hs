@@ -12,11 +12,18 @@ import           Data.Text (Text)
 import qualified Network.Wai.Handler.Warp as Warp
 import           Servant.API
 import           Servant.Server
+--import Servant.Client hiding (client, runClientM)
+import           Servant.Client.Streaming
+
 import           Servant.Types.SourceT
+import  Network.HTTP.Client hiding (Proxy)
 
 type FastAPI
-   = "get" :> StreamGet NewlineFraming JSON (SourceT IO [String])
+   = "get" :> StreamGet NewlineFraming JSON (SourceT IO String)
    :<|> "health" :> Get '[JSON] Text
+
+
+getAPI :<|> _ = client api
 
 api :: Proxy FastAPI
 api = Proxy
@@ -31,8 +38,15 @@ server :: Server FastAPI
 server = fast :<|> health
   where
     fast = do
-      d <- liftIO $ Prelude.readFile "sampleData.json"
-      return $ sourcen 5 $ Prelude.lines d -- assuming each json value is seperated by new line.
+      mgr <- liftIO $ newManager defaultManagerSettings
+      url <- liftIO $ parseBaseUrl "clickhouseurl"
+      liftIO $ withClientM getAPI (mkClientEnv mgr url) (\resp ->
+        case resp of
+          Left err -> return $ source []
+          Right x -> return $ x
+        )
+      --d <- liftIO $ Prelude.readFile "sampleData.json" -- clickhouse/file
+      --return $ sourcen 5 $ Prelude.lines d -- assuming each json value is seperated by new line.
     health = return "up"
 
 app :: Application
